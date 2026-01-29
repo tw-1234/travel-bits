@@ -5,11 +5,12 @@ pipeline {
         nodejs 'NodeJS'
     }
 
-    environment {
-        APP_NAME = "travel-bits"
-        DOCKER_IMAGE = "taizeeba/${travel-bits}:latest"
-        DEPLOY_CONTAINER = "${travel-bits}-container"
-    }
+   environment {
+    APP_NAME = "travel-bits"
+    DOCKER_IMAGE = "taizeeba/travel-bits:latest" // avoid ${APP_NAME} inside environment
+    DEPLOY_CONTAINER = "travel-bits-container"
+}
+
 
     stages {
         stage('Checkout Code') {
