@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS'          // Jenkins → Global Tool Configuration
+        nodejs 'NodeJS'
     }
 
     environment {
@@ -13,18 +13,12 @@ pipeline {
 
     stages {
 
-        /* =========================
-           1. CHECKOUT
-        ========================== */
         stage('Checkout Code') {
             steps {
                 checkout scm
             }
         }
 
-        /* =========================
-           2. VERIFY NODE
-        ========================== */
         stage('Verify Node & NPM') {
             steps {
                 sh '''
@@ -34,28 +28,34 @@ pipeline {
             }
         }
 
-        /* =========================
-           3. DECRYPT SECRETS (SOPS)
-        ========================== */
+        /* ===================== SOPS DECRYPT ===================== */
+
         stage('Decrypt Secrets using SOPS') {
             steps {
                 withCredentials([
                     string(credentialsId: 'SOPS_AGE_KEY', variable: 'SOPS_AGE_KEY')
                 ]) {
                     sh '''
-                        echo "Decrypting secrets using SOPS..."
+                        echo "Decrypting secrets..."
                         export SOPS_AGE_KEY=$SOPS_AGE_KEY
-
-                        sops -d secrets/secrets.enc.yaml > secrets/secrets.dec.yaml
-                        echo "Secrets decrypted successfully"
+                        sops -d secrets.enc.env > secrets.dec.env
                     '''
                 }
             }
         }
 
-        /* =========================
-           4. INSTALL DEPENDENCIES
-        ========================== */
+        stage('Load Environment Variables') {
+            steps {
+                sh '''
+                    set -a
+                    source secrets.dec.env
+                    set +a
+                '''
+            }
+        }
+
+        /* ===================== BUILD ===================== */
+
         stage('Install Dependencies') {
             steps {
                 sh '''
@@ -65,25 +65,23 @@ pipeline {
             }
         }
 
-        /* =========================
-           5. UNIT TESTS
-        ========================== */
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                    npm test || echo "Unit tests failed, continuing pipeline"
+                    npm test || echo "Tests failed, continuing"
                 '''
             }
         }
 
-        /* =========================
-           6. SONARQUBE SCAN
-        ========================== */
+        /* ===================== SONAR ===================== */
+
         stage('SonarQube Scan') {
             steps {
                 script {
                     def scannerHome = tool 'SonarScanner'
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                    withCredentials([
+                        string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')
+                    ]) {
                         withSonarQubeEnv('SonarQube') {
                             sh """
                                 ${scannerHome}/bin/sonar-scanner \
@@ -97,9 +95,6 @@ pipeline {
             }
         }
 
-        /* =========================
-           7. QUALITY GATE
-        ========================== */
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
@@ -108,16 +103,17 @@ pipeline {
             }
         }
 
-        /* =========================
-           8. DOCKER BUILD & PUSH
-        ========================== */
+        /* ===================== DOCKER ===================== */
+
         stage('Docker Build & Push') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                         docker build -t ${DOCKER_IMAGE} .
@@ -127,21 +123,19 @@ pipeline {
             }
         }
 
-        /* =========================
-           9. TRIVY IMAGE SCAN
-        ========================== */
+        /* ===================== SECURITY ===================== */
+
         stage('Trivy Image Scan') {
             steps {
                 sh '''
                     trivy image --severity HIGH,CRITICAL \
-                    --format table ${DOCKER_IMAGE} | tee trivy-results.txt || true
+                    ${DOCKER_IMAGE} | tee trivy-results.txt || true
                 '''
             }
         }
 
-        /* =========================
-           10. DEPLOY CONTAINER
-        ========================== */
+        /* ===================== DEPLOY ===================== */
+
         stage('Deploy Docker Container') {
             steps {
                 sh '''
@@ -154,57 +148,35 @@ pipeline {
             }
         }
 
-        /* =========================
-           11. HEY LOAD TEST
-        ========================== */
         stage('HEY Load Testing') {
             steps {
                 sh '''
-                    hey -z 10s -c 10 http://localhost:3000/ | tee hey-results.txt || true
+                    hey -z 10s -c 10 http://localhost:3000 \
+                    | tee hey-results.txt || true
                 '''
             }
         }
     }
 
+    /* ===================== CLEANUP & EMAIL ===================== */
+
     post {
 
+        always {
+            sh 'rm -f secrets.dec.env'
+            echo "Pipeline finished with status: ${currentBuild.currentResult}"
+        }
+
         success {
-            script {
-                def trivyReport = fileExists('trivy-results.txt')
-                        ? readFile('trivy-results.txt')
-                        : "No Trivy report generated"
-
-                def heyReport = fileExists('hey-results.txt')
-                        ? readFile('hey-results.txt')
-                        : "No HEY report generated"
-
-                mail to: 'taizeebarauf@gmail.com',
-                     subject: "✅ Jenkins SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                     body: """
-Pipeline Status: SUCCESS
-
-Project: ${env.JOB_NAME}
-Build Number: ${env.BUILD_NUMBER}
-Build URL: ${env.BUILD_URL}
-
-===== TRIVY SECURITY SCAN =====
-${trivyReport}
-
-===== HEY LOAD TEST =====
-${heyReport}
-"""
-            }
+            mail to: 'taizeebarauf@gmail.com',
+                 subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Pipeline completed successfully.\n${env.BUILD_URL}"
         }
 
         failure {
             mail to: 'taizeebarauf@gmail.com',
-                 subject: "❌ Jenkins FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Check Jenkins console logs: ${env.BUILD_URL}"
-        }
-
-        always {
-            sh 'rm -f secrets/secrets.dec.yaml || true'
-            echo "Pipeline finished with status: ${currentBuild.currentResult}"
+                 subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Pipeline failed.\n${env.BUILD_URL}"
         }
     }
 }
