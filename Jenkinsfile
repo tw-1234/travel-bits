@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        // NodeJS tool configured in Jenkins
         NODE_HOME = tool name: 'NodeJS-25', type: 'NodeJS'
         PATH = "${NODE_HOME}/bin:${env.PATH}"
     }
@@ -52,6 +51,19 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo 'Installing NPM dependencies...'
+                sh 'npm install'
+            }
+        }
+
+        stage('Audit & Update Vulnerable Dependencies') {
+            steps {
+                echo 'Checking for vulnerabilities...'
+                sh 'npm audit --audit-level=moderate || true'
+
+                echo 'Updating vulnerable dependencies automatically...'
+                sh 'npm audit fix || true'
+
+                echo 'Reinstalling dependencies after updates...'
                 sh 'npm install'
             }
         }
