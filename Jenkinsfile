@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS'  // Only if NodeJS plugin installed
+        nodejs 'NodeJS'
     }
 
     environment {
@@ -27,18 +27,20 @@ pipeline {
             }
         }
 
-        // <-- Replace your old SonarQube Scan stage with this one
- stage('SonarQube Scan') {
-    steps {
-        withSonarQubeEnv('SonarQube') {
-            sh "${tool 'SonarScanner'}/bin/sonar-scanner \
-                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                -Dsonar.sources=. \
-                -Dsonar.host.url=${SONAR_HOST_URL} \
-                -Dsonar.token=${SONAR_TOKEN}"
+        stage('SonarQube Scan') {
+            steps {
+                // Inject the token from Jenkins credentials
+                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                    withSonarQubeEnv('SonarQube') {
+                        sh "${tool 'SonarScanner'}/bin/sonar-scanner \
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                            -Dsonar.sources=. \
+                            -Dsonar.host.url=${SONAR_HOST_URL} \
+                            -Dsonar.login=${SONAR_TOKEN}"
+                    }
+                }
+            }
         }
-    }
-}
 
         stage('Quality Gate') {
             steps {
