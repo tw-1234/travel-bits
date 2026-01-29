@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     environment {
-        PATH = "C:\\Program Files\\nodejs;C:\\SonarScanner\\bin;${env.PATH}"
-        SONAR_HOST_URL = 'http://<your-sonarqube-server>:9000'
+        SONAR_HOST_URL = 'http://localhost:9000'
         SONAR_PROJECT_KEY = 'TravelApp'
     }
 
@@ -11,8 +10,10 @@ pipeline {
 
         stage('Check Node & NPM') {
             steps {
-                sh 'node -v'
-                sh 'npm -v'
+                sh '''
+                node -v
+                npm -v
+                '''
             }
         }
 
@@ -24,16 +25,15 @@ pipeline {
 
         stage('SonarQube Scan') {
             steps {
-                // Use the same credentials ID you created in Jenkins
-                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                    withSonarQubeEnv('MySonarQube') {
-                        sh """
-                        sonar-scanner.bat ^
-                        -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
-                        -Dsonar.sources=. ^
-                        -Dsonar.host.url=%SONAR_HOST_URL% ^
-                        -Dsonar.login=%SONAR_TOKEN%
-                        """
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                    withSonarQubeEnv('SonarQube') {
+                        sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                        -Dsonar.sources=. \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.login=${SONAR_TOKEN}
+                        '''
                     }
                 }
             }
