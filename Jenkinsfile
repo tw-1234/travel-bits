@@ -28,34 +28,28 @@ pipeline {
             }
         }
 
-   stage('Decrypt Secrets using SOPS') {
-    steps {
-        withCredentials([
-            string(credentialsId: 'sops-age-key', variable: 'SOPS_AGE_KEY')
-        ]) {
-            sh '''
-                echo "Decrypting secrets using SOPS..."
-                export SOPS_AGE_KEY=$SOPS_AGE_KEY
-                mkdir -p secrets
-                # Use the existing secrets.env file (already unencrypted maybe)
-                cp secrets.env secrets/secrets.dec.env
-                echo "Secrets ready"
-            '''
+        stage('Decrypt Secrets using SOPS') {
+            steps {
+                sh '''
+                    echo "Preparing secrets (SOPS skipped)..."
+                    mkdir -p secrets
+                    # Copy the existing secrets.env to secrets.dec.env
+                    cp $WORKSPACE/secrets.env $WORKSPACE/secrets/secrets.dec.env
+                    echo "Secrets ready"
+                '''
+            }
         }
-    }
-}
 
-     stage('Load Secrets as Environment Variables') {
-    steps {
-        sh '''
-            echo "Loading secrets..."
-            set -a
-            source secrets/secrets.dec.env
-            set +a
-        '''
-    }
-}
-
+        stage('Load Secrets as Environment Variables') {
+            steps {
+                sh '''
+                    echo "Loading secrets..."
+                    set -a
+                    source secrets/secrets.dec.env
+                    set +a
+                '''
+            }
+        }
 
         stage('Install Dependencies') {
             steps {
@@ -162,7 +156,7 @@ pipeline {
 
         always {
             sh '''
-                rm -f secrets/secrets.dec.yaml
+                rm -f secrets/secrets.dec.env
             '''
             echo "Pipeline finished with status: ${currentBuild.currentResult}"
         }
