@@ -86,8 +86,14 @@ stage('SonarQube Scan') {
 }
 
 
+    stage('Trivy Image Scan') {
+    steps {
+        sh '''
+            trivy image --severity HIGH,CRITICAL taizeeba/travel-bits:latest || true
+        '''
     }
-
+}
+    }
     post {
         success { echo 'Pipeline finished successfully!' }
         failure { echo 'Pipeline failed!' }
