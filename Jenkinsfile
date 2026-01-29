@@ -5,16 +5,17 @@ pipeline {
         nodejs 'NodeJS'
     }
 
-   environment {
-    APP_NAME = "travel-bits"
-    DOCKER_IMAGE = "taizeeba/travel-bits:latest" // avoid ${APP_NAME} inside environment
-    DEPLOY_CONTAINER = "travel-bits-container"
-}
-
+    environment {
+        APP_NAME = "travel-bits"
+        DOCKER_IMAGE = "taizeeba/travel-bits:latest"
+        DEPLOY_CONTAINER = "travel-bits-container"
+    }
 
     stages {
         stage('Checkout Code') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
         }
 
         stage('Check Node & NPM') {
@@ -96,7 +97,9 @@ pipeline {
         }
 
         stage('Docker Pull') {
-            steps { sh "docker pull ${DOCKER_IMAGE}" }
+            steps {
+                sh "docker pull ${DOCKER_IMAGE}"
+            }
         }
 
         stage('Deploy Docker Container') {
@@ -117,23 +120,23 @@ pipeline {
         }
     }
 
-   post {
-    success {
-        node { // <-- add node block here
-            script {
-                def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
-                def heyOutput = "No load test results"
-                if (fileExists('hey-results.txt')) {
-                    def heyText = readFile('hey-results.txt').readLines()
-                    def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
-                    def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
-                    def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
-                    heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
-                }
+    post {
+        success {
+            node {  // <-- important fix
+                script {
+                    def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
+                    def heyOutput = "No load test results"
+                    if (fileExists('hey-results.txt')) {
+                        def heyText = readFile('hey-results.txt').readLines()
+                        def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
+                        def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
+                        def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
+                        heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
+                    }
 
-                mail to: 'you@example.com',
-                     subject: "✅ Jenkins Pipeline Succeeded: ${currentBuild.fullDisplayName}",
-                     body: """
+                    mail to: 'taizeebarauf@gmail.com',
+                         subject: "✅ Jenkins Pipeline Succeeded: ${currentBuild.fullDisplayName}",
+                         body: """
 Pipeline Succeeded!
 
 Project: ${env.JOB_NAME}
@@ -146,26 +149,26 @@ ${trivyOutput}
 HEY Load Test Summary:
 ${heyOutput}
 """
+                }
             }
         }
-    }
 
-    failure {
-        node { // <-- add node block here
-            script {
-                def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
-                def heyOutput = "No load test results"
-                if (fileExists('hey-results.txt')) {
-                    def heyText = readFile('hey-results.txt').readLines()
-                    def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
-                    def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
-                    def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
-                    heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
-                }
+        failure {
+            node {  // <-- important fix
+                script {
+                    def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
+                    def heyOutput = "No load test results"
+                    if (fileExists('hey-results.txt')) {
+                        def heyText = readFile('hey-results.txt').readLines()
+                        def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
+                        def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
+                        def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
+                        heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
+                    }
 
-                mail to: 'you@example.com',
-                     subject: "❌ Jenkins Pipeline Failed: ${currentBuild.fullDisplayName}",
-                     body: """
+                    mail to: 'taizeebarauf@gmail.com',
+                         subject: "❌ Jenkins Pipeline Failed: ${currentBuild.fullDisplayName}",
+                         body: """
 Pipeline Failed!
 
 Project: ${env.JOB_NAME}
@@ -178,11 +181,12 @@ ${trivyOutput}
 HEY Load Test Summary (if available):
 ${heyOutput}
 """
+                }
             }
         }
-    }
 
-    always {
-        echo "Pipeline finished with status: ${currentBuild.currentResult}"
+        always {
+            echo "Pipeline finished with status: ${currentBuild.currentResult}"
+        }
     }
 }
