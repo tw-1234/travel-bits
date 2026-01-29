@@ -19,12 +19,12 @@ pipeline {
 
         stage('Use NodeJS Tool') {
             steps {
-                script {
-                    nodejs(NODEJS_TOOL) {
+                script '''
+                    echo "Using system Node & NPM"
                         sh 'node -v'
                         sh 'npm -v'
-                    }
-                }
+                    
+                '''
             }
         }
 
