@@ -29,21 +29,24 @@ pipeline {
 
         // <-- Replace your old SonarQube Scan stage with this one
         stage('SonarQube Scan') {
-            steps {
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    withSonarQubeEnv('SonarQube') { // must match Jenkins SonarQube server name
-                        tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-                        sh '''
-                        sonar-scanner \
+    steps {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+            withSonarQubeEnv('SonarQube') {
+                script {
+                    // get SonarScanner installation path
+                    def scannerHome = tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                    sh """
+                    ${scannerHome}/bin/sonar-scanner \
                         -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                         -Dsonar.sources=. \
                         -Dsonar.host.url=${SONAR_HOST_URL} \
                         -Dsonar.login=${SONAR_TOKEN}
-                        '''
-                    }
+                    """
                 }
             }
         }
+    }
+}
 
         stage('Quality Gate') {
             steps {
