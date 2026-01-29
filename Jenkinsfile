@@ -28,7 +28,7 @@ pipeline {
             }
         }
 
-        /* ===================== SOPS DECRYPT ===================== */
+        /* ================= SOPS DECRYPT ================= */
 
         stage('Decrypt Secrets using SOPS') {
             steps {
@@ -38,23 +38,24 @@ pipeline {
                     sh '''
                         echo "Decrypting secrets..."
                         export SOPS_AGE_KEY=$SOPS_AGE_KEY
-                        sops -d secrets.enc.env > secrets.dec.env
+                        sops -d secrets/secrets.enc.yaml > secrets/secrets.dec.yaml
                     '''
                 }
             }
         }
 
-        stage('Load Environment Variables') {
+        stage('Load Secrets as Environment Variables') {
             steps {
                 sh '''
-                    set -a
-                    source secrets.dec.env
-                    set +a
+                    export DOCKER_USER=$(yq '.docker.username' secrets/secrets.dec.yaml)
+                    export DOCKER_PASS=$(yq '.docker.password' secrets/secrets.dec.yaml)
+                    export SMTP_USER=$(yq '.smtp.user' secrets/secrets.dec.yaml)
+                    export SMTP_PASS=$(yq '.smtp.password' secrets/secrets.dec.yaml)
                 '''
             }
         }
 
-        /* ===================== BUILD ===================== */
+        /* ================= BUILD ================= */
 
         stage('Install Dependencies') {
             steps {
@@ -73,7 +74,7 @@ pipeline {
             }
         }
 
-        /* ===================== SONAR ===================== */
+        /* ================= SONAR ================= */
 
         stage('SonarQube Scan') {
             steps {
@@ -103,27 +104,17 @@ pipeline {
             }
         }
 
-        /* ===================== DOCKER ===================== */
+        /* ================= DOCKER ================= */
 
         stage('Docker Build & Push') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker build -t ${DOCKER_IMAGE} .
-                        docker push ${DOCKER_IMAGE}
-                    '''
-                }
+                sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker build -t ${DOCKER_IMAGE} .
+                    docker push ${DOCKER_IMAGE}
+                '''
             }
         }
-
-        /* ===================== SECURITY ===================== */
 
         stage('Trivy Image Scan') {
             steps {
@@ -133,8 +124,6 @@ pipeline {
                 '''
             }
         }
-
-        /* ===================== DEPLOY ===================== */
 
         stage('Deploy Docker Container') {
             steps {
@@ -158,12 +147,9 @@ pipeline {
         }
     }
 
-    /* ===================== CLEANUP & EMAIL ===================== */
-
     post {
-
         always {
-            sh 'rm -f secrets.dec.env'
+            sh 'rm -f secrets/secrets.dec.yaml'
             echo "Pipeline finished with status: ${currentBuild.currentResult}"
         }
 
