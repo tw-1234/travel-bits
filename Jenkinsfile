@@ -117,13 +117,11 @@ pipeline {
         }
     }
 
-    post {
-        success {
+   post {
+    success {
+        node { // <-- add node block here
             script {
-                // Trivy results
                 def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
-
-                // HEY results formatting: extract key metrics (Requests/sec, Avg latency, Success)
                 def heyOutput = "No load test results"
                 if (fileExists('hey-results.txt')) {
                     def heyText = readFile('hey-results.txt').readLines()
@@ -133,7 +131,7 @@ pipeline {
                     heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
                 }
 
-                mail to: 'taizeebarauf@gmail.com',
+                mail to: 'you@example.com',
                      subject: "✅ Jenkins Pipeline Succeeded: ${currentBuild.fullDisplayName}",
                      body: """
 Pipeline Succeeded!
@@ -150,8 +148,10 @@ ${heyOutput}
 """
             }
         }
+    }
 
-        failure {
+    failure {
+        node { // <-- add node block here
             script {
                 def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
                 def heyOutput = "No load test results"
@@ -163,7 +163,7 @@ ${heyOutput}
                     heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
                 }
 
-                mail to: 'taizeebarauf@gmail.com',
+                mail to: 'you@example.com',
                      subject: "❌ Jenkins Pipeline Failed: ${currentBuild.fullDisplayName}",
                      body: """
 Pipeline Failed!
@@ -180,9 +180,9 @@ ${heyOutput}
 """
             }
         }
+    }
 
-        always {
-            echo "Pipeline finished with status: ${currentBuild.currentResult}"
-        }
+    always {
+        echo "Pipeline finished with status: ${currentBuild.currentResult}"
     }
 }
