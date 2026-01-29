@@ -2,38 +2,37 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS'
+        nodejs 'NodeJS'     // Jenkins → Global Tool Configuration
     }
 
     environment {
-        APP_NAME = "travel-bits"
-        DOCKER_IMAGE = "taizeeba/travel-bits:latest"
+        APP_NAME         = "travel-bits"
+        DOCKER_IMAGE     = "taizeeba/travel-bits:latest"
         DEPLOY_CONTAINER = "travel-bits-container"
     }
 
     stages {
+
         stage('Checkout Code') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Check Node & NPM') {
+        stage('Verify Node & NPM') {
             steps {
-                script {
-                    echo "Node version:"
-                    sh "${tool 'NodeJS'}/bin/node -v"
-                    echo "NPM version:"
-                    sh "${tool 'NodeJS'}/bin/npm -v"
-                }
+                sh '''
+                    node -v
+                    npm -v
+                '''
             }
         }
 
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    ${NODEJS_HOME}/bin/npm install
-                    ${NODEJS_HOME}/bin/npm audit || true
+                    npm install
+                    npm audit || true
                 '''
             }
         }
@@ -41,7 +40,7 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                    ${NODEJS_HOME}/bin/npm test || echo "Tests failed, but continuing..."
+                    npm test || echo "Unit tests failed, continuing pipeline"
                 '''
             }
         }
@@ -54,9 +53,9 @@ pipeline {
                         withSonarQubeEnv('SonarQube') {
                             sh """
                                 ${scannerHome}/bin/sonar-scanner \
-                                  -Dsonar.projectKey=travel-bits \
-                                  -Dsonar.sources=. \
-                                  -Dsonar.token=$SONAR_TOKEN
+                                -Dsonar.projectKey=travel-bits \
+                                -Dsonar.sources=. \
+                                -Dsonar.token=${SONAR_TOKEN}
                             """
                         }
                     }
@@ -91,23 +90,21 @@ pipeline {
         stage('Trivy Image Scan') {
             steps {
                 sh '''
-                    trivy image --severity HIGH,CRITICAL --format table -q ${DOCKER_IMAGE} | tee trivy-results.txt || true
+                    trivy image --severity HIGH,CRITICAL \
+                    --format table ${DOCKER_IMAGE} | tee trivy-results.txt || true
                 '''
-            }
-        }
-
-        stage('Docker Pull') {
-            steps {
-                sh "docker pull ${DOCKER_IMAGE}"
             }
         }
 
         stage('Deploy Docker Container') {
             steps {
-                sh """
+                sh '''
                     docker rm -f ${DEPLOY_CONTAINER} || true
-                    docker run -d --name ${DEPLOY_CONTAINER} -p 3000:3000 ${DOCKER_IMAGE}
-                """
+                    docker run -d \
+                        --name ${DEPLOY_CONTAINER} \
+                        -p 3000:3000 \
+                        ${DOCKER_IMAGE}
+                '''
             }
         }
 
@@ -121,62 +118,59 @@ pipeline {
     }
 
     post {
+
         success {
             script {
-                def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
-                def heyOutput = "No load test results"
-                if (fileExists('hey-results.txt')) {
-                    def heyText = readFile('hey-results.txt').readLines()
-                    def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
-                    def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
-                    def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
-                    heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
-                }
+                def trivyReport = fileExists('trivy-results.txt')
+                        ? readFile('trivy-results.txt')
+                        : "No Trivy report generated"
+
+                def heyReport = fileExists('hey-results.txt')
+                        ? readFile('hey-results.txt')
+                        : "No HEY report generated"
 
                 mail to: 'taizeebarauf@gmail.com',
-                     subject: "✅ Jenkins Pipeline Succeeded: ${currentBuild.fullDisplayName}",
+                     subject: "✅ Jenkins SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                      body: """
-Pipeline Succeeded!
+Pipeline Status: SUCCESS
 
 Project: ${env.JOB_NAME}
 Build Number: ${env.BUILD_NUMBER}
 Build URL: ${env.BUILD_URL}
 
-Trivy Scan Results:
-${trivyOutput}
+===== TRIVY SECURITY SCAN =====
+${trivyReport}
 
-HEY Load Test Summary:
-${heyOutput}
+===== HEY LOAD TEST =====
+${heyReport}
 """
             }
         }
 
         failure {
             script {
-                def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
-                def heyOutput = "No load test results"
-                if (fileExists('hey-results.txt')) {
-                    def heyText = readFile('hey-results.txt').readLines()
-                    def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
-                    def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
-                    def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
-                    heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
-                }
+                def trivyReport = fileExists('trivy-results.txt')
+                        ? readFile('trivy-results.txt')
+                        : "No Trivy report generated"
+
+                def heyReport = fileExists('hey-results.txt')
+                        ? readFile('hey-results.txt')
+                        : "No HEY report generated"
 
                 mail to: 'taizeebarauf@gmail.com',
-                     subject: "❌ Jenkins Pipeline Failed: ${currentBuild.fullDisplayName}",
+                     subject: "❌ Jenkins FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                      body: """
-Pipeline Failed!
+Pipeline Status: FAILED
 
 Project: ${env.JOB_NAME}
 Build Number: ${env.BUILD_NUMBER}
 Build URL: ${env.BUILD_URL}
 
-Trivy Scan Results (if available):
-${trivyOutput}
+===== TRIVY SECURITY SCAN =====
+${trivyReport}
 
-HEY Load Test Summary (if available):
-${heyOutput}
+===== HEY LOAD TEST =====
+${heyReport}
 """
             }
         }
