@@ -69,18 +69,22 @@ stage('SonarQube Scan') {
             }
         }
 
-      stage('Docker Build & Push') {
+    stage('Docker Build & Push') {
     steps {
-        script {
-            docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-creds') {
-                sh '''
-                    docker build -t taizeeba/travel-bits:latest .
-                    docker push taizeeba/travel-bits:latest
-                '''
-            }
+        withCredentials([usernamePassword(
+            credentialsId: 'dockerhub-creds',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+        )]) {
+            sh '''
+                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                docker build -t taizeeba/travel-bits:latest .
+                docker push taizeeba/travel-bits:latest
+            '''
         }
     }
 }
+
 
     }
 
