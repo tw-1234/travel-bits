@@ -2,15 +2,14 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS'   // Must match your NodeJS installation name in Jenkins
-        dockerTool 'Docker'  // Optional: If you have a named Docker installation
+        nodejs 'NodeJS'   // Make sure this matches your NodeJS installation name in Jenkins
     }
 
     environment {
         SONAR_HOST_URL = 'http://localhost:9000'
         SONAR_PROJECT_KEY = 'TravelApp'
-        IMAGE_NAME = 'travel-app'   // Docker image name
-        IMAGE_TAG = 'latest'        // Docker image tag
+        IMAGE_NAME = 'travel-app'   
+        IMAGE_TAG = 'latest'        
     }
 
     stages {
@@ -66,33 +65,18 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
+        stage('Docker Build & Deploy') {
             steps {
                 sh """
+                # Build Docker image
                 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                """
-            }
-        }
 
-        stage('Docker Push (Optional)') {
-            steps {
-                // Only if you have DockerHub or private registry credentials
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                    '''
-                }
-            }
-        }
+                # Stop previous container if exists
+                docker stop ${IMAGE_NAME} || true
+                docker rm ${IMAGE_NAME} || true
 
-        stage('Deploy') {
-            steps {
-                // Example: running Docker container locally
-                sh """
-                docker stop travel-app || true
-                docker rm travel-app || true
-                docker run -d -p 3000:3000 --name travel-app ${IMAGE_NAME}:${IMAGE_TAG}
+                # Run new container
+                docker run -d -p 3000:3000 --name ${IMAGE_NAME} ${IMAGE_NAME}:${IMAGE_TAG}
                 """
             }
         }
