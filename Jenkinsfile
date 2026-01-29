@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS'
+        nodejs 'NodeJS'        // Jenkins → Global Tool Configuration
     }
 
     environment {
@@ -28,12 +28,10 @@ pipeline {
             }
         }
 
-        /* ================= SOPS DECRYPT ================= */
-
         stage('Decrypt Secrets using SOPS') {
             steps {
                 withCredentials([
-                    string(credentialsId: 'SOPS_AGE_KEY', variable: 'SOPS_AGE_KEY')
+                    string(credentialsId: 'sops-age-key', variable: 'SOPS_AGE_KEY')
                 ]) {
                     sh '''
                         echo "Decrypting secrets..."
@@ -47,15 +45,14 @@ pipeline {
         stage('Load Secrets as Environment Variables') {
             steps {
                 sh '''
-                    export DOCKER_USER=$(yq '.docker.username' secrets/secrets.dec.yaml)
-                    export DOCKER_PASS=$(yq '.docker.password' secrets/secrets.dec.yaml)
-                    export SMTP_USER=$(yq '.smtp.user' secrets/secrets.dec.yaml)
-                    export SMTP_PASS=$(yq '.smtp.password' secrets/secrets.dec.yaml)
+                    echo "Loading secrets..."
+                    set -a
+                    yq -o=json secrets/secrets.dec.yaml | jq -r 'to_entries|map("\\(.key)=\\(.value)")|.[]' > secrets.env
+                    source secrets.env
+                    set +a
                 '''
             }
         }
-
-        /* ================= BUILD ================= */
 
         stage('Install Dependencies') {
             steps {
@@ -69,20 +66,16 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                    npm test || echo "Tests failed, continuing"
+                    npm test || echo "Unit tests failed, continuing"
                 '''
             }
         }
-
-        /* ================= SONAR ================= */
 
         stage('SonarQube Scan') {
             steps {
                 script {
                     def scannerHome = tool 'SonarScanner'
-                    withCredentials([
-                        string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')
-                    ]) {
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         withSonarQubeEnv('SonarQube') {
                             sh """
                                 ${scannerHome}/bin/sonar-scanner \
@@ -104,15 +97,21 @@ pipeline {
             }
         }
 
-        /* ================= DOCKER ================= */
-
         stage('Docker Build & Push') {
             steps {
-                sh '''
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    docker build -t ${DOCKER_IMAGE} .
-                    docker push ${DOCKER_IMAGE}
-                '''
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker build -t ${DOCKER_IMAGE} .
+                        docker push ${DOCKER_IMAGE}
+                    '''
+                }
             }
         }
 
@@ -120,7 +119,7 @@ pipeline {
             steps {
                 sh '''
                     trivy image --severity HIGH,CRITICAL \
-                    ${DOCKER_IMAGE} | tee trivy-results.txt || true
+                    --format table ${DOCKER_IMAGE} | tee trivy-results.txt || true
                 '''
             }
         }
@@ -140,29 +139,31 @@ pipeline {
         stage('HEY Load Testing') {
             steps {
                 sh '''
-                    hey -z 10s -c 10 http://localhost:3000 \
-                    | tee hey-results.txt || true
+                    hey -z 10s -c 10 http://localhost:3000/ | tee hey-results.txt || true
                 '''
             }
         }
     }
 
     post {
+
         always {
-            sh 'rm -f secrets/secrets.dec.yaml'
+            sh '''
+                rm -f secrets/secrets.dec.yaml secrets.env
+            '''
             echo "Pipeline finished with status: ${currentBuild.currentResult}"
         }
 
         success {
             mail to: 'taizeebarauf@gmail.com',
-                 subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Pipeline completed successfully.\n${env.BUILD_URL}"
+                 subject: "✅ Jenkins SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Pipeline executed successfully.\n\nBuild URL: ${env.BUILD_URL}"
         }
 
         failure {
             mail to: 'taizeebarauf@gmail.com',
-                 subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Pipeline failed.\n${env.BUILD_URL}"
+                 subject: "❌ Jenkins FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Pipeline failed.\n\nBuild URL: ${env.BUILD_URL}"
         }
     }
 }
