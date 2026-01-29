@@ -133,7 +133,7 @@ pipeline {
                     heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
                 }
 
-                mail to: 'taizeebarauf.com',
+                mail to: 'taizeebarauf@gmail.com',
                      subject: "✅ Jenkins Pipeline Succeeded: ${currentBuild.fullDisplayName}",
                      body: """
 Pipeline Succeeded!
@@ -163,7 +163,7 @@ ${heyOutput}
                     heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
                 }
 
-                mail to: 'taizeebarauf.com',
+                mail to: 'taizeebarauf@gmail.com',
                      subject: "❌ Jenkins Pipeline Failed: ${currentBuild.fullDisplayName}",
                      body: """
 Pipeline Failed!
