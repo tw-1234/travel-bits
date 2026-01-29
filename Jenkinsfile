@@ -27,7 +27,7 @@ pipeline {
                 // Use the same credentials ID you created in Jenkins
                 withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                     withSonarQubeEnv('MySonarQube') {
-                        bat """
+                        sh """
                         sonar-scanner.bat ^
                         -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
                         -Dsonar.sources=. ^
