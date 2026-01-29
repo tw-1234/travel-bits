@@ -122,21 +122,20 @@ pipeline {
 
     post {
         success {
-            node {  // <-- important fix
-                script {
-                    def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
-                    def heyOutput = "No load test results"
-                    if (fileExists('hey-results.txt')) {
-                        def heyText = readFile('hey-results.txt').readLines()
-                        def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
-                        def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
-                        def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
-                        heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
-                    }
+            script {
+                def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
+                def heyOutput = "No load test results"
+                if (fileExists('hey-results.txt')) {
+                    def heyText = readFile('hey-results.txt').readLines()
+                    def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
+                    def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
+                    def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
+                    heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
+                }
 
-                    mail to: 'taizeebarauf@gmail.com',
-                         subject: "✅ Jenkins Pipeline Succeeded: ${currentBuild.fullDisplayName}",
-                         body: """
+                mail to: 'taizeebarauf.com',
+                     subject: "✅ Jenkins Pipeline Succeeded: ${currentBuild.fullDisplayName}",
+                     body: """
 Pipeline Succeeded!
 
 Project: ${env.JOB_NAME}
@@ -149,26 +148,24 @@ ${trivyOutput}
 HEY Load Test Summary:
 ${heyOutput}
 """
-                }
             }
         }
 
         failure {
-            node {  // <-- important fix
-                script {
-                    def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
-                    def heyOutput = "No load test results"
-                    if (fileExists('hey-results.txt')) {
-                        def heyText = readFile('hey-results.txt').readLines()
-                        def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
-                        def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
-                        def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
-                        heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
-                    }
+            script {
+                def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
+                def heyOutput = "No load test results"
+                if (fileExists('hey-results.txt')) {
+                    def heyText = readFile('hey-results.txt').readLines()
+                    def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
+                    def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
+                    def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
+                    heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
+                }
 
-                    mail to: 'taizeebarauf@gmail.com',
-                         subject: "❌ Jenkins Pipeline Failed: ${currentBuild.fullDisplayName}",
-                         body: """
+                mail to: 'taizeebarauf.com',
+                     subject: "❌ Jenkins Pipeline Failed: ${currentBuild.fullDisplayName}",
+                     body: """
 Pipeline Failed!
 
 Project: ${env.JOB_NAME}
@@ -181,7 +178,6 @@ ${trivyOutput}
 HEY Load Test Summary (if available):
 ${heyOutput}
 """
-                }
             }
         }
 
