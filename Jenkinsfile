@@ -42,14 +42,21 @@ pipeline {
         }
 
         stage('SonarQube Scan') {
-            steps {
-                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-                    withSonarQubeEnv('SonarQube') {
-                        sh "sonar-scanner -Dsonar.projectKey=travel-bits -Dsonar.sources=. -Dsonar.login=$SONAR_TOKEN"
-                    }
-                }
+    steps {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+            withSonarQubeEnv('SonarQube') {
+                sh '''
+                SCANNER_HOME=$(tool SonarScanner)
+                $SCANNER_HOME/bin/sonar-scanner \
+                  -Dsonar.projectKey=travel-bits \
+                  -Dsonar.sources=. \
+                  -Dsonar.login=$SONAR_TOKEN
+                '''
             }
         }
+    }
+}
+
 
         stage('Quality Gate') {
             steps {
