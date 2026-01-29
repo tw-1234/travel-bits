@@ -69,14 +69,19 @@ stage('SonarQube Scan') {
             }
         }
 
-        stage('Docker Build & Deploy') {
-            steps {
+      stage('Docker Build & Push') {
+    steps {
+        script {
+            docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-creds') {
                 sh '''
-                    docker build -t travel-bits:latest .
-                    docker run -d -p 3000:3000 travel-bits:latest
+                    docker build -t taizeeba/travel-bits:latest .
+                    docker push taizeeba/travel-bits:latest
                 '''
             }
         }
+    }
+}
+
     }
 
     post {
