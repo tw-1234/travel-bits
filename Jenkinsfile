@@ -1,8 +1,8 @@
 pipeline {
     agent any
 
-    environment {
-        NODEJS_HOME = tool name: 'NodeJS', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
+    tools {
+        nodejs 'NodeJS'   // Make sure this matches the name in Jenkins Global Tool Config
     }
 
     stages {
@@ -14,20 +14,20 @@ pipeline {
 
         stage('Check Node & NPM') {
             steps {
-                sh '''
+                script {
                     echo "Node version:"
-                    $NODEJS_HOME/bin/node -v
+                    sh "${tool 'NodeJS'}/bin/node -v"
                     echo "NPM version:"
-                    $NODEJS_HOME/bin/npm -v
-                '''
+                    sh "${tool 'NodeJS'}/bin/npm -v"
+                }
             }
         }
 
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    $NODEJS_HOME/bin/npm install
-                    $NODEJS_HOME/bin/npm audit
+                    ${NODEJS_HOME}/bin/npm install
+                    ${NODEJS_HOME}/bin/npm audit
                 '''
             }
         }
@@ -35,22 +35,16 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                    $NODEJS_HOME/bin/npm test || echo "Tests failed, but continuing..."
+                    ${NODEJS_HOME}/bin/npm test || echo "Tests failed, but continuing..."
                 '''
             }
         }
 
         stage('SonarQube Scan') {
             steps {
-                // Use your existing token stored in Jenkins
                 withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
                     withSonarQubeEnv('SonarQube') {
-                        sh '''
-                            sonar-scanner \
-                            -Dsonar.projectKey=travel-bits \
-                            -Dsonar.sources=. \
-                            -Dsonar.login=$SONAR_TOKEN
-                        '''
+                        sh "sonar-scanner -Dsonar.projectKey=travel-bits -Dsonar.sources=. -Dsonar.login=$SONAR_TOKEN"
                     }
                 }
             }
@@ -75,11 +69,7 @@ pipeline {
     }
 
     post {
-        success {
-            echo 'Pipeline finished successfully!'
-        }
-        failure {
-            echo 'Pipeline failed!'
-        }
+        success { echo 'Pipeline finished successfully!' }
+        failure { echo 'Pipeline failed!' }
     }
 }
