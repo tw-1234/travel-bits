@@ -34,7 +34,7 @@ pipeline {
                     echo "Preparing secrets (SOPS skipped)..."
                     mkdir -p secrets
                     # Copy the existing secrets.env to secrets.dec.env
-                    cp $WORKSPACE/secrets.env $WORKSPACE/secrets/secrets.dec.env
+                   cp secrets.env secrets/secrets.dec.env
                     echo "Secrets ready"
                 '''
             }
