@@ -2,14 +2,18 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS'   // Make sure this matches the name in Jenkins Global Tool Config
+        nodejs 'NodeJS'
+    }
+
+    environment {
+        APP_NAME = "travel-bits"
+        DOCKER_IMAGE = "taizeeba/${travel-bits}:latest"
+        DEPLOY_CONTAINER = "${travel-bits}-container"
     }
 
     stages {
         stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Check Node & NPM') {
@@ -26,8 +30,8 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    /Users/macintoshssd/.jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/NodeJS/bin/npm install
-                    /Users/macintoshssd/.jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/NodeJS/bin/npm audit || true
+                    ${NODEJS_HOME}/bin/npm install
+                    ${NODEJS_HOME}/bin/npm audit || true
                 '''
             }
         }
@@ -75,8 +79,8 @@ pipeline {
                 )]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker build -t taizeeba/travel-bits:latest .
-                        docker push taizeeba/travel-bits:latest
+                        docker build -t ${DOCKER_IMAGE} .
+                        docker push ${DOCKER_IMAGE}
                     '''
                 }
             }
@@ -84,11 +88,30 @@ pipeline {
 
         stage('Trivy Image Scan') {
             steps {
-                script {
-                    sh '''
-                        trivy image --severity HIGH,CRITICAL --format table -q taizeeba/travel-bits:latest | tee trivy-results.txt || true
-                    '''
-                }
+                sh '''
+                    trivy image --severity HIGH,CRITICAL --format table -q ${DOCKER_IMAGE} | tee trivy-results.txt || true
+                '''
+            }
+        }
+
+        stage('Docker Pull') {
+            steps { sh "docker pull ${DOCKER_IMAGE}" }
+        }
+
+        stage('Deploy Docker Container') {
+            steps {
+                sh """
+                    docker rm -f ${DEPLOY_CONTAINER} || true
+                    docker run -d --name ${DEPLOY_CONTAINER} -p 3000:3000 ${DOCKER_IMAGE}
+                """
+            }
+        }
+
+        stage('HEY Load Testing') {
+            steps {
+                sh '''
+                    hey -z 10s -c 10 http://localhost:3000/ | tee hey-results.txt || true
+                '''
             }
         }
     }
@@ -96,13 +119,19 @@ pipeline {
     post {
         success {
             script {
-                // Read Trivy results if available
-                def trivyOutput = ''
-                if (fileExists('trivy-results.txt')) {
-                    trivyOutput = readFile('trivy-results.txt')
+                // Trivy results
+                def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
+
+                // HEY results formatting: extract key metrics (Requests/sec, Avg latency, Success)
+                def heyOutput = "No load test results"
+                if (fileExists('hey-results.txt')) {
+                    def heyText = readFile('hey-results.txt').readLines()
+                    def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
+                    def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
+                    def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
+                    heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
                 }
 
-                // Send success email
                 mail to: 'taizeebarauf@gmail.com',
                      subject: "✅ Jenkins Pipeline Succeeded: ${currentBuild.fullDisplayName}",
                      body: """
@@ -114,19 +143,25 @@ Build URL: ${env.BUILD_URL}
 
 Trivy Scan Results:
 ${trivyOutput}
+
+HEY Load Test Summary:
+${heyOutput}
 """
             }
         }
 
         failure {
             script {
-                // Read Trivy results if available
-                def trivyOutput = ''
-                if (fileExists('trivy-results.txt')) {
-                    trivyOutput = readFile('trivy-results.txt')
+                def trivyOutput = fileExists('trivy-results.txt') ? readFile('trivy-results.txt') : "No Trivy results"
+                def heyOutput = "No load test results"
+                if (fileExists('hey-results.txt')) {
+                    def heyText = readFile('hey-results.txt').readLines()
+                    def reqPerSec = heyText.find { it.contains("Requests/sec") } ?: "Requests/sec: N/A"
+                    def avgLatency = heyText.find { it.contains("Average") } ?: "Average latency: N/A"
+                    def successRate = heyText.find { it.contains("Success") } ?: "Success: N/A"
+                    heyOutput = "${reqPerSec}\n${avgLatency}\n${successRate}"
                 }
 
-                // Send failure email
                 mail to: 'taizeebarauf@gmail.com',
                      subject: "❌ Jenkins Pipeline Failed: ${currentBuild.fullDisplayName}",
                      body: """
@@ -138,6 +173,9 @@ Build URL: ${env.BUILD_URL}
 
 Trivy Scan Results (if available):
 ${trivyOutput}
+
+HEY Load Test Summary (if available):
+${heyOutput}
 """
             }
         }
