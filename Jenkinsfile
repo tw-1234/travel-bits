@@ -28,22 +28,14 @@ pipeline {
         }
 
         // <-- Replace your old SonarQube Scan stage with this one
-        stage('SonarQube Scan') {
+ stage('SonarQube Scan') {
     steps {
-        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-            withSonarQubeEnv('SonarQube') {
-                script {
-                    // get SonarScanner installation path
-                    def scannerHome = tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-                    sh """
-                    ${scannerHome}/bin/sonar-scanner \
-                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                        -Dsonar.sources=. \
-                        -Dsonar.host.url=${SONAR_HOST_URL} \
-                        -Dsonar.login=${SONAR_TOKEN}
-                    """
-                }
-            }
+        withSonarQubeEnv('SonarQube') {
+            sh "${tool 'SonarScanner'}/bin/sonar-scanner \
+                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                -Dsonar.sources=. \
+                -Dsonar.host.url=${SONAR_HOST_URL} \
+                -Dsonar.token=${SONAR_TOKEN}"
         }
     }
 }
