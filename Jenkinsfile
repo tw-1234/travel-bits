@@ -28,32 +28,34 @@ pipeline {
             }
         }
 
-        stage('Decrypt Secrets using SOPS') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'sops-age-key', variable: 'SOPS_AGE_KEY')
-                ]) {
-                    sh '''
-                        echo "Decrypting secrets using SOPS..."
-                        export SOPS_AGE_KEY=$SOPS_AGE_KEY
-                        mkdir -p secrets
-                        sops -d secrets/secrets.enc.yaml > secrets/secrets.dec.yaml
-                        echo "Secrets decrypted"
-                    '''
-                }
-            }
+   stage('Decrypt Secrets using SOPS') {
+    steps {
+        withCredentials([
+            string(credentialsId: 'sops-age-key', variable: 'SOPS_AGE_KEY')
+        ]) {
+            sh '''
+                echo "Decrypting secrets using SOPS..."
+                export SOPS_AGE_KEY=$SOPS_AGE_KEY
+                mkdir -p secrets
+                # Use the existing secrets.env file (already unencrypted maybe)
+                cp secrets.env secrets/secrets.dec.env
+                echo "Secrets ready"
+            '''
         }
+    }
+}
 
-        stage('Load Secrets as Environment Variables') {
-            steps {
-                sh '''
-                    echo "Loading secrets..."
-                    set -a
-                    source secrets/secrets.dec.yaml
-                    set +a
-                '''
-            }
-        }
+     stage('Load Secrets as Environment Variables') {
+    steps {
+        sh '''
+            echo "Loading secrets..."
+            set -a
+            source secrets/secrets.dec.env
+            set +a
+        '''
+    }
+}
+
 
         stage('Install Dependencies') {
             steps {
