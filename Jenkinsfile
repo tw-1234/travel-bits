@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS' // Must match the name in Jenkins global config
+        nodejs 'NodeJS'  // Only if NodeJS plugin installed
     }
 
     environment {
@@ -27,10 +27,12 @@ pipeline {
             }
         }
 
+        // <-- Replace your old SonarQube Scan stage with this one
         stage('SonarQube Scan') {
             steps {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    withSonarQubeEnv('SonarQube') {
+                    withSonarQubeEnv('SonarQube') { // must match Jenkins SonarQube server name
+                        tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
                         sh '''
                         sonar-scanner \
                         -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
