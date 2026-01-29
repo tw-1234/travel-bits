@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'NodeJS' // Must match the name in Jenkins global config
+    }
+
     environment {
         SONAR_HOST_URL = 'http://localhost:9000'
         SONAR_PROJECT_KEY = 'TravelApp'
