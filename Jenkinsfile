@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS'
+        nodejs 'NodeJS'  // Must match the NodeJS installation name in Jenkins
     }
 
     environment {
@@ -11,7 +11,6 @@ pipeline {
     }
 
     stages {
-
         stage('Check Node & NPM') {
             steps {
                 sh '''
@@ -29,7 +28,7 @@ pipeline {
 
         stage('SonarQube Scan') {
             steps {
-                // This injects the SONAR_TOKEN from Jenkins Credentials
+                // Correct way to inject SONAR_TOKEN from Jenkins credentials
                 withCredentials([string(credentialsId: 'sqa_2d4f48d392b6fbb09669c5ec1f9df3d793c63ba3', variable: 'SONAR_TOKEN')]) {
                     withSonarQubeEnv('SonarQube') {
                         sh """
