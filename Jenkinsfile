@@ -41,18 +41,18 @@ pipeline {
             }
         }
 
-  stage('SonarQube Scan') {
+stage('SonarQube Scan') {
     steps {
         script {
             def scannerHome = tool 'SonarScanner'
             withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                 withSonarQubeEnv('SonarQube') {
-                    sh '''
-                    ''' + scannerHome + '''/bin/sonar-scanner \
+                    sh """
+                    ${scannerHome}/bin/sonar-scanner \
                       -Dsonar.projectKey=travel-bits \
                       -Dsonar.sources=. \
-                      -Dsonar.login=$SONAR_TOKEN
-                    '''
+                      -Dsonar.token=$SONAR_TOKEN
+                    """
                 }
             }
         }
