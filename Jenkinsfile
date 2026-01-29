@@ -99,22 +99,26 @@ pipeline {
         }
     }
 
-    post {
-        always {
-            script {
-                if (fileExists('secrets/secrets.dec.env')) {
-                    sh 'rm -f secrets/secrets.dec.env'
-                }
+post {
+    always {
+        script {
+            if (fileExists('secrets/secrets.dec.env')) {
+                sh 'rm -f secrets/secrets.dec.env'
             }
-            echo "Pipeline finished."
         }
+        echo "Pipeline finished."
+        // Send email
+        mail to: 'taizeebarauf@gmail.com',
+             subject: "Jenkins Pipeline: ${currentBuild.fullDisplayName}",
+             body: "Status: ${currentBuild.currentResult}\nCheck console output at ${env.BUILD_URL}"
+    }
 
-        success {
-            echo "Pipeline completed successfully!"
-        }
+    success {
+        echo "Pipeline completed successfully!"
+    }
 
-        failure {
-            echo "Pipeline failed!"
-        }
+    failure {
+        echo "Pipeline failed!"
     }
 }
+
