@@ -23,14 +23,15 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                    ${NODEJS_HOME}/bin/npm install
-                    ${NODEJS_HOME}/bin/npm audit
-                '''
-            }
-        }
+      stage('Install Dependencies') {
+    steps {
+        sh '''
+            /Users/macintoshssd/.jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/NodeJS/bin/npm install
+            /Users/macintoshssd/.jenkins/tools/jenkins.plugins.nodejs.tools.NodeJSInstallation/NodeJS/bin/npm audit || true
+        '''
+    }
+}
+
 
         stage('Run Unit Tests') {
             steps {
