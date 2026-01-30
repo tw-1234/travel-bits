@@ -78,10 +78,7 @@ node {
         // ========================
         // 7. UI Testing (Selenium – placeholder)
         // ========================
-        stage('UI Testing - Selenium') {
-            echo "Selenium UI tests placeholder (frontend only project)"
-        }
-
+      
         // ========================
         // 8. SonarQube Scan
         // ========================
