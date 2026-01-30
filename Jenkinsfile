@@ -1,245 +1,112 @@
-pipeline {
-    agent any
+node {
 
-    environment {
-        PROJECT_NAME = "travel-bits"
-        DOCKER_IMAGE = "taizeeba/travel-bits:latest"
-        DOCKER_CONTAINER = "travel-bits-container"
-        NODEJS_TOOL = "NodeJS-25" // your NodeJS installation in Jenkins
-        RECIPIENTS = "taizeebarauf@gmail.com" // replace with your email
-    }
+    // ========================
+    // Environment variables
+    // ========================
+    env.PROJECT_NAME      = "travel-bits"
+    env.DOCKER_IMAGE       = "taizeeba/travel-bits:latest"
+    env.DOCKER_CONTAINER   = "travel-bits-container"
+    env.RECIPIENTS         = "taizeebarauf@gmail.com"
 
-    stages {
-
-        stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
-        }
-
-       pipeline {
-    agent any
-
-    environment {
-        PROJECT_NAME = "travel-bits"
-        DOCKER_IMAGE = "taizeeba/travel-bits:latest"
-        DOCKER_CONTAINER = "travel-bits-container"
-        NODEJS_TOOL = "NodeJS-25" // your NodeJS installation in Jenkins
-        RECIPIENTS = "taizeebarauf@gmail.com" // replace with your email
-    }
-
-    stages {
+    // ========================
+    // Pipeline stages
+    // ========================
+    try {
 
         stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
+            checkout scm
         }
 
-        stage('Use NodeJS Tool') {
-            steps {
-                script '''
-                    echo "Using system Node & NPM"
-                        sh 'node -v'
-                        sh 'npm -v'
-                    
-                '''
-            }
+        stage('Verify Node & NPM') {
+            sh '''
+                echo "Using system Node & NPM"
+                node -v
+                npm -v
+            '''
         }
 
         stage('Decrypt Secrets using SOPS') {
-            steps {
-                script {
-                    if (fileExists('secrets.env')) {
-                        sh '''
-                            echo "Decrypting secrets..."
-                            mkdir -p secrets
-                            cp secrets.env secrets/secrets.dec.env
-                        '''
-                    } else {
-                        echo "No secrets.env found, skipping SOPS decryption"
-                    }
+            script {
+                if (fileExists('secrets.env')) {
+                    sh '''
+                        echo "Decrypting secrets..."
+                        mkdir -p secrets
+                        cp secrets.env secrets/secrets.dec.env
+                    '''
+                } else {
+                    echo "No secrets.env found, skipping SOPS decryption"
                 }
             }
         }
 
         stage('Load Secrets as Environment Variables') {
-            when {
-                expression { fileExists('secrets/secrets.dec.env') }
-            }
-            steps {
-                sh '''
-                    echo "Loading secrets into environment"
-                    set -a
-                    . secrets/secrets.dec.env
-                    set +a
-                '''
+            script {
+                if (fileExists('secrets/secrets.dec.env')) {
+                    sh '''
+                        echo "Loading secrets into environment"
+                        set -a
+                        . secrets/secrets.dec.env
+                        set +a
+                    '''
+                }
             }
         }
 
         stage('Install Dependencies') {
-            steps {
-                sh 'npm install'
-            }
+            sh 'npm install'
         }
 
         stage('Run Unit Tests') {
-            steps {
-                sh 'npm test || echo "Tests failed, continuing..."'
-            }
+            sh 'npm test || echo "Tests failed, continuing..."'
         }
 
         stage('SonarQube Scan') {
-            steps {
-                echo "SonarQube stage placeholder (optional)"
-            }
+            echo "SonarQube stage placeholder (optional)"
         }
 
         stage('Docker Build & Deploy') {
-            steps {
-                sh '''
-                    docker build -t $DOCKER_IMAGE .
-                    docker rm -f $DOCKER_CONTAINER || true
-                    docker run -d --name $DOCKER_CONTAINER -p 3000:3000 $DOCKER_IMAGE
-                '''
-            }
+            sh '''
+                docker build -t $DOCKER_IMAGE .
+                docker rm -f $DOCKER_CONTAINER || true
+                docker run -d --name $DOCKER_CONTAINER -p 3000:3000 $DOCKER_IMAGE
+            '''
         }
 
         stage('Trivy Image Scan') {
-            steps {
-                sh 'echo "Trivy scan placeholder"'
-            }
+            sh 'echo "Trivy scan placeholder"'
         }
 
         stage('HEY Load Testing') {
-            steps {
-                sh '''
-                    hey -z 10s -c 10 http://localhost:3000/ | tee hey-results.txt
-                '''
-            }
-        }
-    }
-
-    post {
-        always {
-            script {
-                if (fileExists('secrets/secrets.dec.env')) {
-                    sh 'rm -f secrets/secrets.dec.env'
-                }
-            }
-            echo "Pipeline finished."
+            sh 'hey -z 10s -c 10 http://localhost:3000/ | tee hey-results.txt'
         }
 
-        success {
-            echo "Pipeline completed successfully!"
-            mail to: "$RECIPIENTS",
-                 subject: "SUCCESS: Build ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Good news! The build succeeded.\n\nJob: ${env.JOB_NAME}\nBuild Number: ${env.BUILD_NUMBER}\nCheck console output at: ${env.BUILD_URL}"
-        }
+        // ========================
+        // If all stages pass
+        // ========================
+        echo "Pipeline completed successfully!"
+        mail to: "${env.RECIPIENTS}",
+             subject: "SUCCESS: Build ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+             body: "Good news! The build succeeded.\n\nJob: ${env.JOB_NAME}\nBuild Number: ${env.BUILD_NUMBER}\nCheck console output at: ${env.BUILD_URL}"
 
-        failure {
-            echo "Pipeline failed!"
-            mail to: "$RECIPIENTS",
-                 subject: "FAILURE: Build ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Oops! The build failed.\n\nJob: ${env.JOB_NAME}\nBuild Number: ${env.BUILD_NUMBER}\nCheck console output at: ${env.BUILD_URL}"
-        }
-    }
-}
-        stage('Decrypt Secrets using SOPS') {
-            steps {
-                script {
-                    if (fileExists('secrets.env')) {
-                        sh '''
-                            echo "Decrypting secrets..."
-                            mkdir -p secrets
-                            cp secrets.env secrets/secrets.dec.env
-                        '''
-                    } else {
-                        echo "No secrets.env found, skipping SOPS decryption"
-                    }
-                }
-            }
-        }
+    } catch (err) {
 
-        stage('Load Secrets as Environment Variables') {
-            when {
-                expression { fileExists('secrets/secrets.dec.env') }
-            }
-            steps {
-                sh '''
-                    echo "Loading secrets into environment"
-                    set -a
-                    . secrets/secrets.dec.env
-                    set +a
-                '''
-            }
-        }
+        // ========================
+        // On failure
+        // ========================
+        echo "Pipeline failed: ${err}"
+        mail to: "${env.RECIPIENTS}",
+             subject: "FAILURE: Build ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+             body: "Oops! The build failed.\n\nJob: ${env.JOB_NAME}\nBuild Number: ${env.BUILD_NUMBER}\nCheck console output at: ${env.BUILD_URL}"
+        throw err
 
-        stage('Install Dependencies') {
-            steps {
-                sh 'npm install'
-            }
-        }
+    } finally {
 
-        stage('Run Unit Tests') {
-            steps {
-                sh 'npm test || echo "Tests failed, continuing..."'
-            }
-        }
-
-        stage('SonarQube Scan') {
-            steps {
-                echo "SonarQube stage placeholder (optional)"
-            }
-        }
-
-        stage('Docker Build & Deploy') {
-            steps {
-                sh '''
-                    docker build -t $DOCKER_IMAGE .
-                    docker rm -f $DOCKER_CONTAINER || true
-                    docker run -d --name $DOCKER_CONTAINER -p 3000:3000 $DOCKER_IMAGE
-                '''
-            }
-        }
-
-        stage('Trivy Image Scan') {
-            steps {
-                sh 'echo "Trivy scan placeholder"'
-            }
-        }
-
-        stage('HEY Load Testing') {
-            steps {
-                sh '''
-                    hey -z 10s -c 10 http://localhost:3000/ | tee hey-results.txt
-                '''
-            }
-        }
-    }
-
-    post {
-        always {
-            script {
-                if (fileExists('secrets/secrets.dec.env')) {
-                    sh 'rm -f secrets/secrets.dec.env'
-                }
-            }
-            echo "Pipeline finished."
-        }
-
-        success {
-            echo "Pipeline completed successfully!"
-            mail to: "$RECIPIENTS",
-                 subject: "SUCCESS: Build ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Good news! The build succeeded.\n\nJob: ${env.JOB_NAME}\nBuild Number: ${env.BUILD_NUMBER}\nCheck console output at: ${env.BUILD_URL}"
-        }
-
-        failure {
-            echo "Pipeline failed!"
-            mail to: "$RECIPIENTS",
-                 subject: "FAILURE: Build ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Oops! The build failed.\n\nJob: ${env.JOB_NAME}\nBuild Number: ${env.BUILD_NUMBER}\nCheck console output at: ${env.BUILD_URL}"
+        // ========================
+        // Cleanup always
+        // ========================
+        echo "Cleaning up..."
+        if (fileExists('secrets/secrets.dec.env')) {
+            sh 'rm -f secrets/secrets.dec.env'
         }
     }
 }
