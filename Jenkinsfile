@@ -11,7 +11,7 @@ node {
     // ========================
     // Pipeline stages
     // ========================
-    try {,
+    try {
 
         stage('Checkout Code') {
             checkout scm
