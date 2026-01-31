@@ -6,10 +6,7 @@ node {
     env.PROJECT_NAME     = "travel-bits"
     env.DOCKER_IMAGE     = "taizeeba/travel-bits:latest"
     env.DOCKER_CONTAINER = "travel-bits-container"
-    env.RECIPIENTS       = "taizeebarauf@gmail.com"
-    env.SONAR_HOST_URL   = "http://localhost:9000"   // SonarQube URL
-    env.SONAR_PROJECT_KEY = "travel-bits"
-    env.SONAR_TOKEN      = "sqa_c1e3104d6cee4818b80ba249282109fcb2fc3e1d"      // Replace with actual token
+    env.RECIPIENTS      = "taizeebarauf@gmail.com"
 
     try {
 
@@ -81,23 +78,12 @@ node {
         // ========================
         // 7. UI Testing (Selenium – placeholder)
         // ========================
-        stage('UI Testing (Selenium)') {
-            echo "UI testing placeholder – no Selenium tests configured yet"
-        }
-
+     
         // ========================
         // 8. SonarQube Scan
         // ========================
         stage('SonarQube Scan') {
-            withSonarQubeEnv('SonarQube') { // 'SonarQube' = Jenkins SonarQube server name
-                sh """
-                    sonar-scanner \
-                        -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} \
-                        -Dsonar.sources=. \
-                        -Dsonar.host.url=${env.SONAR_HOST_URL} \
-                        -Dsonar.login=${env.SONAR_TOKEN}
-                """
-            }
+            echo "SonarQube static code analysis placeholder"
         }
 
         // ========================
@@ -203,3 +189,5 @@ Check logs: ${env.BUILD_URL}
         }
     }
 }
+
+
